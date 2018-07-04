@@ -66,7 +66,7 @@ const createTransformer = () => {
       }
     }
     paths.forEach(directoryPath => (cache[directoryPath] = cache[directory]))
-    return cache[directory] || ''
+    return cache[directory] || {}
   }
 
   return {
