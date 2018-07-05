@@ -30,7 +30,7 @@ const BABEL_CONFIG_KEY = 'babel'
 const PACKAGE_JSON = 'package.json'
 const THIS_FILE = fs.readFileSync(__filename)
 
-const createTransformer = () => {
+const createTransformer = options => {
   const cache = Object.create(null)
 
   const getBabelOptions = filename => {
@@ -71,7 +71,6 @@ const createTransformer = () => {
 
   return {
     canInstrument: true,
-
     getCacheKey(
       fileData,
       filename,
@@ -93,7 +92,6 @@ const createTransformer = () => {
         .update(instrument ? 'instrument' : '')
         .digest('hex')
     },
-
     process(
       src,
       filename,
@@ -107,21 +105,23 @@ const createTransformer = () => {
         return src
       }
 
-      const babelOptions = getBabelOptions(filename)
-      const options = Object.assign({}, babelOptions, {
+      // Preserve previous behavior where the provided options are used if set,
+      // falling back to detecting the closest .babelrc file in parent-folders.
+      const babelOptions = options || getBabelOptions(filename);
+      const theseOptions = Object.assign({}, babelOptions, {
         filename,
         compact: false,
-        plugins:
-          (babelOptions && babelOptions.plugins) || [],
-        presets:
-          ((babelOptions && babelOptions.presets) || []).concat([jestPreset]),
+        plugins: (babelOptions && babelOptions.plugins) || [],
+        presets: ((babelOptions && babelOptions.presets) || []).concat([
+          jestPreset,
+        ]),
         sourceMaps: 'both'
       })
-      delete babelOptions.cacheDirectory
+      delete theseOptions.cacheDirectory
       if (transformOptions && transformOptions.instrument) {
-        options.auxiliaryCommentBefore = ' istanbul ignore next '
+        theseOptions.auxiliaryCommentBefore = ' istanbul ignore next '
         // Copied from jest-runtime transform.js
-        options.plugins = options.plugins.concat([
+        theseOptions.plugins = theseOptions.plugins.concat([
           [
             babelIstanbulPlugin,
             {
@@ -134,10 +134,12 @@ const createTransformer = () => {
       }
 
       // babel v7 might return null in the case when the file has been ignored.
-      const transformResult = babelTransform(src, options)
+      const transformResult = babelTransform(src, theseOptions)
+
       return transformResult || src
     }
   }
 }
 
 module.exports = createTransformer()
+module.exports.createTransformer = createTransformer
